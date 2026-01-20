@@ -37,6 +37,41 @@ If you find this project helpful, please consider sponsoring its development. Yo
 - **GitHub Actions Integration**: Trigger Claude Code tasks in your GitHub workflows.
 - **Plugin System**: Extend functionality with custom transformers.
 
+## 🔐 OpenAI OAuth (ChatGPT Subscription)
+
+This fork supports OpenAI OAuth for Codex models so you do not need a static API key.
+
+### 1. Authenticate
+
+```shell
+ccr auth openai
+```
+
+Tokens are stored at `~/.claude-code-router/auth.json`.
+
+### 2. Configure Provider
+
+```json
+{
+  "Providers": [
+    {
+      "name": "openai",
+      "api_base_url": "https://api.openai.com/v1/chat/completions",
+      "api_key": "",
+      "models": ["gpt-5.2"],
+      "transformer": {
+        "use": ["openai-responses", "openai-codex-oauth"]
+      }
+    }
+  ],
+  "Router": {
+    "default": "openai,gpt-5.2"
+  }
+}
+```
+
+If `api_key` is empty for the OpenAI provider, the router will auto-enable the OAuth transformers and inject a dummy key internally.
+
 ## 🚀 Getting Started
 
 ### 1. Installation
