@@ -72,6 +72,24 @@ Tokens are stored at `~/.claude-code-router/auth.json`.
 
 If `api_key` is empty for the OpenAI provider, the router will auto-enable the OAuth transformers and inject a dummy key internally.
 
+## 🛠️ Build This Fork
+
+This fork adds OAuth features and a CLI build option that skips the UI build.
+
+### Build without UI (fast path)
+
+```shell
+pnpm --filter @musistudio/llms build
+pnpm --filter @CCR/server build
+SKIP_UI=1 pnpm --filter @CCR/cli build
+```
+
+The CLI bundle will be at `dist/cli.js`. You can run it directly:
+
+```shell
+node ./dist/cli.js <command>
+```
+
 ## 🚀 Getting Started
 
 ### 1. Installation
