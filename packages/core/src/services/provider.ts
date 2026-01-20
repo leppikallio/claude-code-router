@@ -29,6 +29,7 @@ export class ProviderService {
   private initializeFromProvidersArray(providersConfig: ConfigProvider[]) {
     providersConfig.forEach((providerConfig: ConfigProvider) => {
       try {
+        this.ensureOpenAICodexOauthConfig(providerConfig);
         if (
           !providerConfig.name ||
           !providerConfig.api_base_url ||
@@ -96,6 +97,40 @@ export class ProviderService {
         this.logger.error(`${providerConfig.name} provider registered error: ${error}`);
       }
     });
+  }
+
+  private hasCodexOauthTransformer(providerConfig: ConfigProvider): boolean {
+    const useList = providerConfig.transformer?.use;
+    if (!Array.isArray(useList)) return false;
+    return useList.some((entry) => {
+      if (typeof entry === "string") return entry === "openai-codex-oauth";
+      if (Array.isArray(entry)) return entry[0] === "openai-codex-oauth";
+      return false;
+    });
+  }
+
+  private ensureOpenAICodexOauthConfig(providerConfig: ConfigProvider): void {
+    if (providerConfig.name !== "openai") return;
+    if (providerConfig.api_key) return;
+
+    const transformer = providerConfig.transformer || {};
+    const useList = Array.isArray(transformer.use) ? [...transformer.use] : [];
+    const required = ["openai-responses", "openai-codex-oauth"];
+
+    required.forEach((name) => {
+      const exists = useList.some((entry) => {
+        if (typeof entry === "string") return entry === name;
+        if (Array.isArray(entry)) return entry[0] === name;
+        return false;
+      });
+      if (!exists) useList.push(name);
+    });
+
+    providerConfig.transformer = {
+      ...transformer,
+      use: useList,
+    };
+    providerConfig.api_key = "opencode-oauth-dummy-key";
   }
 
   registerProvider(request: RegisterProviderRequest): LLMProvider {

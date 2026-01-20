@@ -31,12 +31,16 @@ try {
     cwd: rootDir
   });
 
-  // Step 2: Build UI package
-  console.log('Building UI package...');
-  execSync('pnpm build', {
-    stdio: 'inherit',
-    cwd: uiDir
-  });
+  // Step 2: Build UI package (optional)
+  if (process.env.SKIP_UI !== '1') {
+    console.log('Building UI package...');
+    execSync('pnpm build', {
+      stdio: 'inherit',
+      cwd: uiDir
+    });
+  } else {
+    console.log('Skipping UI build (SKIP_UI=1)');
+  }
 
   // Step 3: Create CLI dist directory
   const cliDistDir = path.join(cliDir, 'dist');
@@ -63,16 +67,18 @@ try {
     console.warn('⚠ Warning: tiktoken_bg.wasm not found in server dist, skipping...');
   }
 
-  // Step 6: Copy UI index.html from UI dist to CLI dist
-  console.log('Copying index.html from UI to CLI dist...');
-  const uiSource = path.join(uiDir, 'dist/index.html');
-  const uiDest = path.join(cliDistDir, 'index.html');
+  // Step 6: Copy UI index.html from UI dist to CLI dist (if built)
+  if (process.env.SKIP_UI !== '1') {
+    console.log('Copying index.html from UI to CLI dist...');
+    const uiSource = path.join(uiDir, 'dist/index.html');
+    const uiDest = path.join(cliDistDir, 'index.html');
 
-  if (fs.existsSync(uiSource)) {
-    fs.copyFileSync(uiSource, uiDest);
-    console.log('✓ index.html copied successfully!');
-  } else {
-    console.warn('⚠ Warning: index.html not found in UI dist, skipping...');
+    if (fs.existsSync(uiSource)) {
+      fs.copyFileSync(uiSource, uiDest);
+      console.log('✓ index.html copied successfully!');
+    } else {
+      console.warn('⚠ Warning: index.html not found in UI dist, skipping...');
+    }
   }
 
   // Step 7: Copy CLI dist to project root

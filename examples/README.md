@@ -30,6 +30,12 @@
 - 代理配置
 - 高级功能开关
 
+### 4. `openai-oauth-preset-example.json` - OpenAI OAuth Example
+Uses ChatGPT subscription OAuth (Codex):
+- No API key required
+- Select a Codex model
+- Requires `ccr auth openai` login first
+
 ## 如何使用这些示例
 
 ### 方法1：直接复制到预设目录

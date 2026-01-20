@@ -8,6 +8,7 @@ import {
 import { quote } from 'shell-quote';
 import minimist from "minimist";
 import { createEnvVariables } from "./createEnvVariables";
+import type { ClaudeSettingsFlag } from "../types/claudeSettings";
 
 export interface PresetConfig {
   noServer?: boolean;
@@ -36,6 +37,7 @@ export async function executeCodeCommand(
   if (envOverrides) {
     Object.assign(env, envOverrides);
   }
+
 
   // Build settingsFlag
   let settingsFlag: ClaudeSettingsFlag = {

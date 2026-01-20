@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "node ../../scripts/build-server.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "TS_NODE_TRANSPILE_ONLY=1 ts-node -P tsconfig.json src/index.ts"
   },
   "keywords": [
     "claude",

@@ -106,6 +106,9 @@ export class OpenAIResponsesTransformer implements Transformer {
         (request as any).instructions = firstSystem.content;
       }
     }
+    if (!(request as any).instructions) {
+      (request as any).instructions = "You are a helpful assistant.";
+    }
 
     request.messages.forEach((message) => {
       if (message.role === "system") return;
@@ -154,6 +157,8 @@ export class OpenAIResponsesTransformer implements Transformer {
 
     (request as any).input = input;
     delete (request as any).messages;
+
+    (request as any).store = false;
 
     if (Array.isArray(request.tools)) {
       const webSearch = request.tools.find(
@@ -204,7 +209,47 @@ export class OpenAIResponsesTransformer implements Transformer {
   }
 
   async transformResponseOut(response: Response): Promise<Response> {
-    const contentType = response.headers.get("Content-Type") || "";
+    let contentType = response.headers.get("Content-Type") || "";
+
+    if (response.body) {
+      const reader = response.body.getReader();
+      const first = await reader.read();
+      if (!first.done) {
+        const decoder = new TextDecoder();
+        const head = decoder.decode(first.value).trimStart();
+        const looksLikeSse = head.startsWith("event:") || head.startsWith("data:");
+
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(first.value);
+            const pump = () => {
+              reader.read().then(({ done, value }) => {
+                if (done) {
+                  controller.close();
+                  return;
+                }
+                controller.enqueue(value);
+                pump();
+              }).catch((error) => controller.error(error));
+            };
+            pump();
+          },
+        });
+
+        const rebuilt = new Response(stream, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        });
+
+        if (looksLikeSse) {
+          rebuilt.headers.set("Content-Type", "text/event-stream");
+          contentType = "text/event-stream";
+        }
+
+        response = rebuilt;
+      }
+    }
 
     if (contentType.includes("application/json")) {
       const jsonResponse: any = await response.json();

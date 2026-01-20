@@ -334,9 +334,13 @@ async function sendRequestToProvider(
 
   // Send HTTP request
   // Prepare headers
+  const configHeaders = (config?.headers || {}) as Record<string, string>;
+  const hasAuthHeader = Object.keys(configHeaders).some(
+    (key) => key.toLowerCase() === "authorization"
+  );
   const requestHeaders: Record<string, string> = {
-    Authorization: `Bearer ${provider.apiKey}`,
-    ...(config?.headers || {}),
+    ...(hasAuthHeader ? {} : { Authorization: `Bearer ${provider.apiKey}` }),
+    ...configHeaders,
   };
 
   for (const key in requestHeaders) {
@@ -443,23 +447,70 @@ async function processResponseTransformers(
  * Format and return response
  * Handle HTTP status codes, format streaming and regular responses
  */
-function formatResponse(response: any, reply: FastifyReply, body: any) {
+async function formatResponse(response: any, reply: FastifyReply, body: any) {
   // Set HTTP status code
   if (!response.ok) {
     reply.code(response.status);
   }
 
-  // Handle streaming response
-  const isStream = body.stream === true;
-  if (isStream) {
+  const contentType = response.headers?.get?.("Content-Type") || "";
+  if (body.stream === true || contentType.includes("text/event-stream")) {
     reply.header("Content-Type", "text/event-stream");
     reply.header("Cache-Control", "no-cache");
     reply.header("Connection", "keep-alive");
     return reply.send(response.body);
-  } else {
-    // Handle regular JSON response
-    return response.json();
   }
+
+  if (response.body) {
+    const reader = response.body.getReader();
+    const first = await reader.read();
+    if (!first.done) {
+      const decoder = new TextDecoder();
+      const head = decoder.decode(first.value).trimStart();
+      const looksLikeSse = head.startsWith("event:") || head.startsWith("data:");
+      if (process.env.DEBUG_SSE === "1") {
+        console.log("[DEBUG_SSE] response peek", {
+          contentType,
+          head: head.slice(0, 200),
+        });
+      }
+
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(first.value);
+          const pump = () => {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                controller.close();
+                return;
+              }
+              controller.enqueue(value);
+              pump();
+            }).catch((error) => controller.error(error));
+          };
+          pump();
+        },
+      });
+
+      const newResponse = new Response(stream, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+
+      if (looksLikeSse) {
+        reply.header("Content-Type", "text/event-stream");
+        reply.header("Cache-Control", "no-cache");
+        reply.header("Connection", "keep-alive");
+        return reply.send(newResponse.body);
+      }
+
+      return newResponse.json();
+    }
+  }
+
+  // Handle regular JSON response
+  return response.json();
 }
 
 export const registerApiRoutes = async (

@@ -176,6 +176,34 @@ cat ~/.claude-code-router/config.json
 }
 ```
 
+### OpenAI OAuth (ChatGPT subscription)
+
+Use OAuth to avoid storing a static API key. Tokens are stored at `~/.claude-code-router/auth.json`.
+
+1. Run `ccr auth openai` and complete the browser login.
+2. Configure the provider to use the OAuth transformer:
+
+```json5
+{
+  "Providers": [
+    {
+      "name": "openai",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "opencode-oauth-dummy-key",
+      "models": ["gpt-5.1-codex-max"],
+      "transformer": {
+        "use": ["openai-codex-oauth"]
+      }
+    }
+  ],
+  "Router": {
+    "default": "openai,gpt-5.1-codex-max"
+  }
+}
+```
+
+To remove tokens, run `ccr auth logout openai`.
+
 ### Anthropic
 
 ```json5

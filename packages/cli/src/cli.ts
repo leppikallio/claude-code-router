@@ -18,8 +18,11 @@ import { join } from "path";
 import { parseStatusLineData, StatusLineInput } from "./utils/statusline";
 import {handlePresetCommand} from "./utils/preset";
 import { handleInstallCommand } from "./utils/installCommand";
+import { loginOpenAI, logoutOpenAI } from "./utils/auth";
 
-
+if (process.argv[2] === "--") {
+  process.argv.splice(2, 1);
+}
 const command = process.argv[2];
 
 // Define all known commands
@@ -34,6 +37,7 @@ const KNOWN_COMMANDS = [
   "preset",
   "install",
   "activate",
+  "auth",
   "env",
   "ui",
   "-v",
@@ -56,6 +60,7 @@ Commands:
   preset        Manage presets (export, install, list, delete)
   install       Install preset from GitHub marketplace
   activate      Output environment variables for shell integration
+  auth          Authenticate providers (e.g. OpenAI OAuth)
   ui            Open the web UI in browser
   -v, version   Show version information
   -h, help      Show help information
@@ -74,6 +79,8 @@ Examples:
   ccr install my-preset                  # Install preset from marketplace
   eval "$(ccr activate)"  # Set environment variables globally
   ccr ui
+  ccr auth openai
+  ccr auth logout openai
 `;
 
 async function waitForService(
@@ -94,6 +101,18 @@ async function waitForService(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return false;
+}
+
+async function isServerReachable(): Promise<boolean> {
+  try {
+    const config = await readConfigFile();
+    const port = config?.PORT || 3456;
+    const url = `http://127.0.0.1:${port}/health`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(1500) });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function main() {
@@ -261,6 +280,28 @@ async function main() {
         }
       });
       break;
+    case "auth": {
+      const args = process.argv.slice(3);
+      let action = "login";
+      let provider = args[0];
+
+      if (args[0] === "login" || args[0] === "logout") {
+        action = args[0];
+        provider = args[1];
+      }
+
+      if (provider !== "openai") {
+        console.error("Usage: ccr auth [login|logout] openai");
+        process.exit(1);
+      }
+
+      if (action === "logout") {
+        await logoutOpenAI();
+      } else {
+        await loginOpenAI();
+      }
+      break;
+    }
     // ADD THIS CASE
     case "model":
       await runModelSelector();
@@ -278,6 +319,11 @@ async function main() {
       break;
     case "code":
       if (!isRunning) {
+        if (await isServerReachable()) {
+          const codeArgs = process.argv.slice(3);
+          executeCodeCommand(codeArgs);
+          break;
+        }
         console.log("Service not running, starting service...");
         const cliPath = join(__dirname, "cli.js");
         const startProcess = spawn("node", [cliPath, "start"], {
